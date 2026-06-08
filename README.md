@@ -61,7 +61,9 @@ flowchart TD
 ```mermaid
 flowchart TD
 
-    C[Cliente Socket]
+    C1[Cliente 1]
+    C2[Cliente 2]
+    C3[Cliente 3]
 
     S[Servidor Socket]
 
@@ -72,7 +74,9 @@ flowchart TD
 
     DB[(SQLite)]
 
-    C -->|TCP| S
+    C1 -->|TCP| S
+    C2 -->|TCP| S
+    C3 -->|TCP| S
 
     S --> Q
 
