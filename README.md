@@ -11,7 +11,7 @@ Esta entrega transforma el sistema monolítico anterior en una arquitectura dist
 
 ---
 
-## Diagrama de la Arquitectura
+## Arquitectura conceptual (Representa un sistema distribuido real)
 
 
 ```mermaid
@@ -54,6 +54,33 @@ flowchart TD
 
     W1 -->|Guarda Archivos| S3
     W2 -->|Guarda Archivos| S3
+```
+
+## Diagrama de la implementación realizada
+
+```mermaid
+flowchart TD
+
+    C[Cliente Socket]
+
+    S[Servidor Socket]
+
+    Q[Cola de Tareas Queue]
+
+    W1[Worker 1]
+    W2[Worker 2]
+
+    DB[(SQLite)]
+
+    C -->|TCP| S
+
+    S --> Q
+
+    Q --> W1
+    Q --> W2
+
+    W1 --> DB
+    W2 --> DB
 ```
 
 ## Implementación
