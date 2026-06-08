@@ -140,13 +140,13 @@ pfo3-sistema-distribuido/
 ### Iniciar el servidor
 
 ```bash
-python servidor_socket.py
+python servidor.py
 ```
 
 ### Ejecutar un cliente
 
 ```bash
-python cliente_socket.py
+python cliente.py
 ```
 
 Se pueden ejecutar múltiples instancias del cliente simultáneamente para verificar el procesamiento concurrente de solicitudes por parte de los Workers.
