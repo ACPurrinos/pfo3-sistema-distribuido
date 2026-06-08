@@ -1,91 +1,135 @@
 import socket
 import threading
+import sqlite3
 from queue import Queue
 
 HOST = "localhost"
 PORT = 5000
 
 cola = Queue()
+db_lock = threading.Lock()
 
-tareas = []
-lock = threading.Lock()
+# -----------------------
+# BASE DE DATOS
+# -----------------------
 
-# -------------------
+def crear_db():
+    conn = sqlite3.connect("tareas.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS tareas(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT NOT NULL
+    )
+    """)
+    conn.commit()
+    conn.close()
+
+# -----------------------
 # WORKERS
-# -------------------
+# -----------------------
 
 def worker(nombre):
-
     while True:
-
         cliente, mensaje = cola.get()
-
-        partes = mensaje.split(";", 1)
-
-        comando = partes[0]
-
-        if comando == "CREAR":
-
-            titulo = partes[1]
-
-            with lock:
-                tareas.append(titulo)
-
-            respuesta = f"{nombre}: tarea creada"
-
-        elif comando == "VER":
-
-            with lock:
-
+        try:
+            partes = mensaje.split(";", 1)
+            comando = partes[0]
+            if comando == "CREAR":
+                titulo = partes[1]
+                with db_lock:
+                    conn = sqlite3.connect("tareas.db")
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "INSERT INTO tareas(titulo) VALUES (?)",
+                        (titulo,)
+                    )
+                    conn.commit()
+                    conn.close()
+                respuesta = f"{nombre}: tarea creada"
+            elif comando == "VER":
+                with db_lock:
+                    conn = sqlite3.connect("tareas.db")
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT id,titulo FROM tareas"
+                    )
+                    tareas = cursor.fetchall()
+                    conn.close()
                 if tareas:
-                    respuesta = "\n".join(tareas)
+                    respuesta = "\n".join(
+                        f"{id} - {titulo}"
+                        for id, titulo in tareas
+                    )
                 else:
                     respuesta = "No hay tareas"
+            elif comando == "BORRAR":
+                id_tarea = int(partes[1])
+                with db_lock:
+                    conn = sqlite3.connect("tareas.db")
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "DELETE FROM tareas WHERE id=?",
+                        (id_tarea,)
+                    )
+                    eliminadas = cursor.rowcount
+                    conn.commit()
+                    conn.close()
+                if eliminadas:
+                    respuesta = f"{nombre}: tarea eliminada"
+                else:
+                    respuesta = "No existe esa tarea"
+            else:
+                respuesta = "Comando inválido"
+            cliente.send(respuesta.encode())
+        except Exception as e:
+            cliente.send(
+                f"Error: {str(e)}".encode()
+            )
+        finally:
+            cliente.close()
+            cola.task_done()
 
-        else:
+# -----------------------
+# CLIENTES
+# -----------------------
 
-            respuesta = "Comando inválido"
-
-        cliente.send(respuesta.encode())
-
+def atender_cliente(cliente):
+    try:
+        mensaje = cliente.recv(1024).decode()
+        cola.put((cliente, mensaje))
+    except:
         cliente.close()
 
-        cola.task_done()
 
-
-# -------------------
+# -----------------------
 # SERVIDOR
-# -------------------
+# -----------------------
 
 def servidor():
-
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    s.bind((HOST, PORT))
-
-    s.listen()
-
-    print("Servidor escuchando...")
-
+    crear_db()
     threading.Thread(
         target=worker,
         args=("Worker-1",),
         daemon=True
     ).start()
-
     threading.Thread(
         target=worker,
         args=("Worker-2",),
         daemon=True
     ).start()
-
+    s = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_STREAM
+    )
+    s.bind((HOST, PORT))
+    s.listen()
+    print("Servidor escuchando...")
     while True:
-
         cliente, addr = s.accept()
-
-        mensaje = cliente.recv(1024).decode()
-
-        cola.put((cliente, mensaje))
-
-
+        threading.Thread(
+            target=atender_cliente,
+            args=(cliente,),
+            daemon=True
+        ).start()
 servidor()
