@@ -5,8 +5,10 @@ from queue import Queue
 
 HOST = "localhost"
 PORT = 5000
+DATABASE = "tareas.db"
 
 cola = Queue()
+
 db_lock = threading.Lock()
 
 # -----------------------
@@ -14,7 +16,7 @@ db_lock = threading.Lock()
 # -----------------------
 
 def crear_db():
-    conn = sqlite3.connect("tareas.db")
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS tareas(
@@ -25,20 +27,24 @@ def crear_db():
     conn.commit()
     conn.close()
 
+
 # -----------------------
 # WORKERS
 # -----------------------
 
 def worker(nombre):
+
     while True:
         cliente, mensaje = cola.get()
         try:
+            print(f"{nombre} procesando: {mensaje}")
             partes = mensaje.split(";", 1)
             comando = partes[0]
             if comando == "CREAR":
                 titulo = partes[1]
+
                 with db_lock:
-                    conn = sqlite3.connect("tareas.db")
+                    conn = sqlite3.connect(DATABASE)
                     cursor = conn.cursor()
                     cursor.execute(
                         "INSERT INTO tareas(titulo) VALUES (?)",
@@ -47,12 +53,13 @@ def worker(nombre):
                     conn.commit()
                     conn.close()
                 respuesta = f"{nombre}: tarea creada"
+
             elif comando == "VER":
                 with db_lock:
-                    conn = sqlite3.connect("tareas.db")
+                    conn = sqlite3.connect(DATABASE)
                     cursor = conn.cursor()
                     cursor.execute(
-                        "SELECT id,titulo FROM tareas"
+                        "SELECT id, titulo FROM tareas"
                     )
                     tareas = cursor.fetchall()
                     conn.close()
@@ -66,10 +73,10 @@ def worker(nombre):
             elif comando == "BORRAR":
                 id_tarea = int(partes[1])
                 with db_lock:
-                    conn = sqlite3.connect("tareas.db")
+                    conn = sqlite3.connect(DATABASE)
                     cursor = conn.cursor()
                     cursor.execute(
-                        "DELETE FROM tareas WHERE id=?",
+                        "DELETE FROM tareas WHERE id = ?",
                         (id_tarea,)
                     )
                     eliminadas = cursor.rowcount
@@ -101,7 +108,6 @@ def atender_cliente(cliente):
     except:
         cliente.close()
 
-
 # -----------------------
 # SERVIDOR
 # -----------------------
@@ -122,14 +128,23 @@ def servidor():
         socket.AF_INET,
         socket.SOCK_STREAM
     )
+    s.setsockopt(
+        socket.SOL_SOCKET,
+        socket.SO_REUSEADDR,
+        1
+    )
+
     s.bind((HOST, PORT))
     s.listen()
-    print("Servidor escuchando...")
+    print(f"Servidor escuchando en {HOST}:{PORT}")
     while True:
         cliente, addr = s.accept()
+        print(f"Conexión desde {addr}")
         threading.Thread(
             target=atender_cliente,
             args=(cliente,),
             daemon=True
         ).start()
+
+
 servidor()

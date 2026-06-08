@@ -24,7 +24,11 @@ while True:
         break
     else:
         continue
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_STREAM
+    )
+
     s.connect((HOST, PORT))
     s.send(mensaje.encode())
     respuesta = s.recv(4096).decode()
